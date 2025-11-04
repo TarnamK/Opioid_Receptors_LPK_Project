@@ -1,0 +1,108 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+#Read the files
+#IG <- read.fna("~/Desktop/Megumi Lab NOTES/ncbi_dataset/ncbi_dataset/data/GCF_014839805.1/cds_from_genomic.fna")
+
+```
+
+```{r}
+# Dowload the packages if needed
+pkgs <- c("rentrez","dplyr","purrr","tibble","stringr")
+to_install <- pkgs[!pkgs %in% installed.packages()[,"Package"]]
+if(length(to_install)) install.packages(to_install, repos="https://cloud.r-project.org")
+invisible(lapply(pkgs, library, character.only=TRUE))
+```
+
+```{r}
+#load the libraries
+library(rentrez)
+library(dplyr)
+library(stringr)
+library(tibble)
+library(purrr)
+library(Biostrings)
+```
+
+
+```{r}
+fna_file <- "~/Desktop/Megumi Lab NOTES/ncbi_dataset/ncbi_dataset/data/GCF_014839805.1/cds_from_genomic.fna"
+dna_sequences <- readDNAStringSet(fna_file)
+dna_sequences
+
+```
+
+```{r}
+x <- dna_sequences
+
+hdr <- names(x)
+hits <- grepl("opioid|oprm|oprd|oprk|mu[- ]opioid|delta[- ]opioid|kappa[- ]opioid", hdr, ignore.case = TRUE)
+which(hits)
+hdr[hits]
+```
+
+
+
+```{r}
+library(DECIPHER)
+library(Biostrings)
+
+# dna = your DNAStringSet (24,854 records)
+genes_all <- FindGenes(dna_sequences)                 
+
+# keep predictions marked as 'Gene'
+genes <- genes_all[genes_all[, "Gene"] == 1, ]
+
+# get protein translations of predicted genes
+aa <- ExtractGenes(genes, dna, type = "AAStringSet")
+
+# lengths (LPK/pyrokinin receptors ~330–460 aa)
+aa <- aa[width(aa) >= 300 & width(aa) <= 550]
+
+# save for BLAST search
+writeXStringSet(aa, "predicted_orfs.faa")
+
+```
+```{r}
+# Standard Genetic Code Table
+genetic_code <- c(
+  "ATA"="I", "ATC"="I", "ATT"="I", "ATG"="M",
+  "ACA"="T", "ACC"="T", "ACG"="T", "ACT"="T",
+  "AAC"="N", "AAT"="N", "AAA"="K", "AAG"="K",
+  "AGC"="S", "AGT"="S", "AGA"="R", "AGG"="R",
+  "CTA"="L", "CTC"="L", "CTG"="L", "CTT"="L",
+  "CCA"="P", "CCC"="P", "CCG"="P", "CCT"="P",
+  "CAC"="H", "CAT"="H", "CAA"="Q", "CAG"="Q",
+  "CGA"="R", "CGC"="R", "CGG"="R", "CGT"="R",
+  "GTA"="V", "GTC"="V", "GTG"="V", "GTT"="V",
+  "GCA"="A", "GCC"="A", "GCG"="A", "GCT"="A",
+  "GAC"="D", "GAT"="D", "GAA"="E", "GAG"="E",
+  "GGA"="G", "GGC"="G", "GGG"="G", "GGT"="G",
+  "TCA"="S", "TCC"="S", "TCG"="S", "TCT"="S",
+  "TTC"="F", "TTT"="F", "TTA"="L", "TTG"="L",
+  "TAC"="Y", "TAT"="Y", "TAA"="*", "TAG"="*",
+  "TGC"="C", "TGT"="C", "TGA"="*", "TGG"="W"
+)
+
+#Converting the genes into AA
+dna_sequences
+translate_dna <- function(dna_sequences) {
+  dna_seq <- toupper(gsub("[^ATCG]", "", dna_seq))  # Clean sequence
+  codons <- substring(dna_seq, seq(1, nchar(dna_seq)-2, 3), seq(3, nchar(dna_seq), 3))
+  aa_seq <- sapply(codons, function(codon) {
+    if (codon %in% names(genetic_code)) {
+      genetic_code[[codon]]
+    } else {
+      "X"  # unknown codon
+    }
+  })
+  return(paste(aa_seq, collapse = ""))
+}
+
+# Finding the gene similarity of different species
+dna_sequences 
+```
+

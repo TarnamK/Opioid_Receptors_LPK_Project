@@ -1,0 +1,3 @@
+Organism Scientific Name	Organism Common Name	Organism Qualifier	Taxonomy id	Assembly Name	Assembly Accession	Source	Annotation	Level	Contig N50	Size	Submission Date	Gene Count	BioProject	BioSample
+Manduca sexta	tobacco hornworm	isolate: Smith_Timp_Sample1	7130	JHU_Msex_v1.0	GCA_014839805.1	GenBank		Chromosome	424948	470021481	2020-10-02		PRJNA658700	SAMN15881793
+Manduca sexta	tobacco hornworm	isolate: Smith_Timp_Sample1	7130	JHU_Msex_v1.0	GCF_014839805.1	RefSeq	NCBI Manduca sexta Annotation Release 102	Chromosome	424948	470021481	2020-10-02	19909	PRJNA658700	SAMN15881793
