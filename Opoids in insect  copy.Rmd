@@ -1,0 +1,190 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+#Read the files
+#IG <- read.fna("~/Desktop/Megumi Lab NOTES/ncbi_dataset/ncbi_dataset/data/GCF_014839805.1/cds_from_genomic.fna")
+
+```
+
+```{r}
+# Dowload the packages if needed
+pkgs <- c("rentrez","dplyr","purrr","tibble","stringr")
+to_install <- pkgs[!pkgs %in% installed.packages()[,"Package"]]
+if(length(to_install)) install.packages(to_install, repos="https://cloud.r-project.org")
+invisible(lapply(pkgs, library, character.only=TRUE))
+```
+
+```{r}
+#load the libraries
+library(rentrez)
+library(dplyr)
+library(stringr)
+library(tibble)
+library(purrr)
+library(Biostrings)
+```
+
+
+```{r}
+fna_file <- "~/Desktop/Megumi Lab NOTES/ncbi_dataset/ncbi_dataset/data/GCF_014839805.1/cds_from_genomic.fna"
+dna_sequences <- readDNAStringSet(fna_file)
+dna_sequences
+
+```
+
+```{r}
+x <- dna_sequences
+
+hdr <- names(x)
+hits <- grepl("opioid|oprm|oprd|oprk|mu[- ]opioid|delta[- ]opioid|kappa[- ]opioid", hdr, ignore.case = TRUE)
+which(hits)
+hdr[hits]
+```
+
+
+
+```{r}
+library(DECIPHER)
+library(Biostrings)
+
+# dna = your DNAStringSet (24,854 records)
+genes_all <- FindGenes(dna_sequences)                 
+
+# keep predictions marked as 'Gene'
+genes <- genes_all[genes_all[, "Gene"] == 1, ]
+
+# get protein translations of predicted genes
+aa <- ExtractGenes(genes, dna, type = "AAStringSet")
+
+# lengths (LPK/pyrokinin receptors ~330–460 aa)
+aa <- aa[width(aa) >= 300 & width(aa) <= 550]
+
+# save for BLAST search
+writeXStringSet(aa, "predicted_orfs.faa")
+
+```
+
+```{r}
+# Standard Genetic Code Table
+codon_table <- list(
+    TTT = "F", TTC = "F", TTA = "L", TTG = "L",
+    TCT = "S", TCC = "S", TCA = "S", TCG = "S",
+    TAT = "Y", TAC = "Y", TAA = "*", TAG = "*",
+    TGT = "C", TGC = "C", TGA = "*", TGG = "W",
+    CTT = "L", CTC = "L", CTA = "L", CTG = "L",
+    CCT = "P", CCC = "P", CCA = "P", CCG = "P",
+    CAT = "H", CAC = "H", CAA = "Q", CAG = "Q",
+    CGT = "R", CGC = "R", CGA = "R", CGG = "R",
+    ATT = "I", ATC = "I", ATA = "I", ATG = "M",
+    ACT = "T", ACC = "T", ACA = "T", ACG = "T",
+    AAT = "N", AAC = "N", AAA = "K", AAG = "K",
+    AGT = "S", AGC = "S", AGA = "R", AGG = "R",
+    GTT = "V", GTC = "V", GTA = "V", GTG = "V",
+    GCT = "A", GCC = "A", GCA = "A", GCG = "A",
+    GAT = "D", GAC = "D", GAA = "E", GAG = "E",
+    GGT = "G", GGC = "G", GGA = "G", GGG = "G"
+)
+
+#Converting the genes into AA
+translate_sequence <- function(seq_string) {
+  # Clean to ensure only A, T, G, C
+  seq_string <- gsub("[^ATCG]", "", seq_string)
+  codons <- substring(seq_string, seq(1, nchar(seq_string)-2, 3), seq(3, nchar(seq_string), 3))
+  aa_seq <- sapply(codons, function(codon) {
+    if (codon %in% names(codon_table)) codon_table[[codon]] else "?"
+  })
+  paste(aa_seq, collapse = "")
+}
+
+# Convert all sequences
+dna_char_seqs <- as.character(dna_sequences)
+protein_sequences <- sapply(dna_char_seqs, translate_sequence)
+
+# Convert to AAStringSet (optional, for saving as FASTA)
+library(Biostrings)
+protein_set <- AAStringSet(protein_sequences)
+names(protein_set) <- names(dna_sequences)
+
+# Save to FASTA
+writeXStringSet(protein_set, filepath = "proteins_custom.fasta")
+file.show("proteins_custom.fasta")
+cat("✅ All DNA sequences translated using custom codon table and saved to 'proteins_custom.fasta'\n")
+
+
+ 
+```
+
+```{r}
+# Protein similarities :% similar to genome
+
+
+library(Biostrings)
+
+# Example amino acid sequences- Put the real dataset that gurleen has
+seq1 <- "MVLSPADKTNVKAAW"
+seq2 <- "MVLSAADKTNVKAAW"
+
+# Create AAString objects
+aa1 <- AAString(seq1)
+aa2 <- AAString(seq2)
+
+# Perform pairwise alignment (global alignment)
+#BiocManager::install("pwalign")
+alignment <- pairwiseAlignment(aa1, aa2, substitutionMatrix = "BLOSUM62", gapOpening = -10, gapExtension = -0.5)
+
+# View alignment
+alignment
+
+# Compute percent similarity
+aligned_seq1 <- as.character(pattern(alignment))
+aligned_seq2 <- as.character(subject(alignment))
+
+# Calculate number of matches (identical amino acids)
+matches <- sum(strsplit(aligned_seq1, "")[[1]] == strsplit(aligned_seq2, "")[[1]])
+
+# Calculate percent similarity
+percent_similarity <- (matches / nchar(aligned_seq1)) * 100
+cat("Percent similarity:", percent_similarity, "%\n")
+```
+```{r}
+#Start terminal or final terminal similarity ~10-8
+
+
+library(Biostrings)
+
+#amino acid sequences Please put the real files here
+seq1 <- "MVLSPADKTNVKAAWGKVGAHAGEYGAEALERMFLSFPTTKTYFPHFDLSHGSAQVKGHGKK"
+seq2 <- "MVLSAADKTNVKAAWGKVGGHAAEYGAEALERMFLSFPTTKTYFPHFDLSHGSAQVKGHGKK"
+
+# Define number of terminal residues to compare
+N <- 8  # you can change this (e.g. 10, 20)
+
+# Extract N-terminal (start)
+nterm_seq1 <- substr(seq1, 1, N)
+nterm_seq2 <- substr(seq2, 1, N)
+
+# Extract C-terminal (end)
+cterm_seq1 <- substr(seq1, nchar(seq1) - N + 1, nchar(seq1))
+cterm_seq2 <- substr(seq2, nchar(seq2) - N + 1, nchar(seq2))
+
+# Function to compute percent identity
+percent_similarity <- function(s1, s2) {
+  min_len <- min(nchar(s1), nchar(s2))
+  s1 <- substr(s1, 1, min_len)
+  s2 <- substr(s2, 1, min_len)
+  matches <- sum(strsplit(s1, "")[[1]] == strsplit(s2, "")[[1]])
+  return((matches / min_len) * 100)
+}
+
+# Calculate similarities
+nterm_similarity <- percent_similarity(nterm_seq1, nterm_seq2)
+cterm_similarity <- percent_similarity(cterm_seq1, cterm_seq2)
+
+cat("N-terminal similarity (first", N, "residues):", nterm_similarity, "%\n")
+cat("C-terminal similarity (last", N, "residues):", cterm_similarity, "%\n")
+
+```
+
